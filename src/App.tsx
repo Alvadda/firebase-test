@@ -1,10 +1,11 @@
 import { initializeApp } from 'firebase/app'
 import { firebaseConfig } from './firebase.config'
 import { getAuth, signInWithPopup, GoogleAuthProvider, User } from 'firebase/auth'
-import { getFirestore, collection, doc, getDoc, setDoc, query, where, getDocs, setColl, addDoc, updateDoc } from 'firebase/firestore'
+import { getFirestore, collection, doc, getDoc, setDoc, query, where, getDocs, addDoc, updateDoc, orderBy } from 'firebase/firestore'
 
 import './style/style.scss'
 import { useEffect, useState } from 'react'
+import moment from 'moment'
 
 interface Session {
   start: Date
@@ -18,6 +19,8 @@ const projectsCollectionRef = collection(db, 'users/0NCo1I2Nfzin7pxBYV2z/project
 const sessionCollectionRef = collection(db, 'users/0NCo1I2Nfzin7pxBYV2z/session')
 
 const provider = new GoogleAuthProvider()
+
+moment.locale('de')
 
 export const App = () => {
   const [user, setUser] = useState<User | null>()
@@ -109,7 +112,8 @@ export const App = () => {
   }
 
   const showSession = async () => {
-    const querySnapshot = await getDocs(sessionCollectionRef)
+    // const querySnapshot = await getDocs(sessionCollectionRef)
+    const querySnapshot = await getDocs(query(sessionCollectionRef, orderBy('start', 'desc')))
     const newSessions: Session[] = []
     querySnapshot.forEach((doc) => {
       const session = doc.data()
@@ -145,8 +149,8 @@ export const App = () => {
           <ul>
             {sessions.map((session) => (
               <li key={session.start.toISOString()}>
-                From: <span>{session.start.toISOString()}</span>
-                To: <span>{session?.end && session?.end.toISOString()}</span>
+                From: <span>{moment(session.start).format('DD.MM.YY : h:mm:ss')} </span>
+                To: <span>{session?.end && moment(session.end).format('DD.MM.YY : h:mm:ss')}</span>
               </li>
             ))}
           </ul>
