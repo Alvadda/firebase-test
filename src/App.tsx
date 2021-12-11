@@ -1,7 +1,21 @@
 import { initializeApp } from 'firebase/app'
 import { firebaseConfig } from './firebase.config'
 import { getAuth, signInWithPopup, GoogleAuthProvider, User } from 'firebase/auth'
-import { getFirestore, collection, doc, getDoc, setDoc, query, where, getDocs, addDoc, updateDoc, orderBy } from 'firebase/firestore'
+import {
+  getFirestore,
+  collection,
+  doc,
+  getDoc,
+  setDoc,
+  query,
+  where,
+  getDocs,
+  addDoc,
+  updateDoc,
+  orderBy,
+  onSnapshot,
+  Timestamp,
+} from 'firebase/firestore'
 
 import './style/style.scss'
 import { useEffect, useState } from 'react'
@@ -12,11 +26,14 @@ interface Session {
   end?: Date
 }
 
+interface Project {
+  name: string
+  rate: number
+}
+
 const app = initializeApp(firebaseConfig)
 const auth = getAuth(app)
 const db = getFirestore(app)
-const projectsCollectionRef = collection(db, 'users/0NCo1I2Nfzin7pxBYV2z/projects')
-const sessionCollectionRef = collection(db, 'users/0NCo1I2Nfzin7pxBYV2z/session')
 
 const provider = new GoogleAuthProvider()
 
@@ -26,15 +43,17 @@ export const App = () => {
   const [user, setUser] = useState<User | null>()
   const [error, setError] = useState()
   const [sessions, setSessions] = useState<Session[]>([])
-  console.log(sessions)
+  const [projects, setProjects] = useState<Project[]>([])
+
+  const projectsCollectionRef = collection(db, 'users/0NCo1I2Nfzin7pxBYV2z/projects')
+  const sessionCollectionRef = collection(db, 'users/0NCo1I2Nfzin7pxBYV2z/session')
+
+  // const projectsCollectionRef = collection(db, `users/${user?.uid}/projects`)
+  // const sessionCollectionRef = collection(db, `users/${user?.uid}/session`)
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
       if (!user) return
-      console.log(user)
-
-      const testUserDoc = await getDoc(doc(db, 'users', '0NCo1I2Nfzin7pxBYV2z'))
-      console.log('Test User', testUserDoc.data())
 
       const userDocRef = doc(db, 'users', user?.uid)
       const userDoc = await getDoc(userDocRef)
@@ -54,7 +73,52 @@ export const App = () => {
     return unsubscribe
   }, [])
 
-  const fsTimestampToDate = (fsTimestamp: any) => {
+  useEffect(() => {
+    // const q = query(collection(db, `users/${user?.uid}/session`), orderBy('start', 'desc'))
+    const q = query(sessionCollectionRef, orderBy('start', 'desc'))
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const newSessions: Session[] = []
+      querySnapshot.forEach((doc) => {
+        const session = doc.data()
+        if (!session.activ) {
+          const s = {
+            start: fsTimestampToDate(session.start),
+            end: fsTimestampToDate(session.end),
+          }
+          newSessions.push(s)
+        }
+        if (session.activ) {
+          const s = {
+            start: fsTimestampToDate(session.start),
+          }
+          newSessions.unshift(s)
+        }
+      })
+      setSessions([...newSessions])
+    })
+
+    return unsubscribe
+  }, [user])
+
+  useEffect(() => {
+    const getProjects = async () => {
+      const querySnapshot = await getDocs(projectsCollectionRef)
+      const newProjects: Project[] = []
+      querySnapshot.forEach((doc) => {
+        const project = doc.data()
+        newProjects.push({
+          name: project.name,
+          rate: project.rate,
+        })
+      })
+      setProjects([...newProjects])
+    }
+    if (user) {
+      getProjects()
+    }
+  }, [user, projectsCollectionRef])
+
+  const fsTimestampToDate = (fsTimestamp: Timestamp) => {
     return new Date(fsTimestamp.seconds * 1000)
   }
 
@@ -64,13 +128,6 @@ export const App = () => {
     } catch (error: any) {
       setError(error.message)
     }
-  }
-
-  const getProjects = async () => {
-    const querySnapshot = await getDocs(projectsCollectionRef)
-    querySnapshot.forEach((doc) => {
-      console.log(doc.id, ' => ', doc.data())
-    })
   }
 
   const addProjects = async () => {
@@ -111,46 +168,31 @@ export const App = () => {
     }
   }
 
-  const showSession = async () => {
-    // const querySnapshot = await getDocs(sessionCollectionRef)
-    const querySnapshot = await getDocs(query(sessionCollectionRef, orderBy('start', 'desc')))
-    const newSessions: Session[] = []
-    querySnapshot.forEach((doc) => {
-      const session = doc.data()
-      if (!session.activ) {
-        const s = {
-          start: fsTimestampToDate(session.start),
-          end: fsTimestampToDate(session.end),
-        }
-        newSessions.push(s)
-      }
-      if (session.activ) {
-        const s = {
-          start: fsTimestampToDate(session.start),
-        }
-        newSessions.unshift(s)
-      }
-    })
-    setSessions([...newSessions])
-  }
   return (
     <>
-      <h1>React TypeScript Template</h1>
+      <h1>Time Tracking</h1>
       {user && (
         <div>
           <p>User: {user.displayName}</p>
           <p>Email: {user.email}</p>
           <button onClick={() => auth.signOut()}>Sign Out</button>
-          <button onClick={() => getProjects()}>Get Projects</button>
           <button onClick={() => addProjects()}>Add Projects</button>
           <button onClick={() => trackTime()}>Track Time</button>
-          <button onClick={() => showSession()}>Show Session</button>
           <p>Sessions</p>
           <ul>
             {sessions.map((session) => (
               <li key={session.start.toISOString()}>
                 From: <span>{moment(session.start).format('DD.MM.YY : h:mm:ss')} </span>
                 To: <span>{session?.end && moment(session.end).format('DD.MM.YY : h:mm:ss')}</span>
+              </li>
+            ))}
+          </ul>
+          <p>Projects</p>
+          <ul>
+            {projects.map((project) => (
+              <li key={project.name}>
+                Name: <span>{project.name} - </span>
+                Rate: <span>{project.rate}</span>
               </li>
             ))}
           </ul>
