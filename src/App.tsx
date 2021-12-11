@@ -35,6 +35,8 @@ const app = initializeApp(firebaseConfig)
 const auth = getAuth(app)
 const db = getFirestore(app)
 
+const projectsCollectionRef = collection(db, 'users/0NCo1I2Nfzin7pxBYV2z/projects')
+const sessionCollectionRef = collection(db, 'users/0NCo1I2Nfzin7pxBYV2z/session')
 const provider = new GoogleAuthProvider()
 
 moment.locale('de')
@@ -45,27 +47,24 @@ export const App = () => {
   const [sessions, setSessions] = useState<Session[]>([])
   const [projects, setProjects] = useState<Project[]>([])
 
-  const projectsCollectionRef = collection(db, 'users/0NCo1I2Nfzin7pxBYV2z/projects')
-  const sessionCollectionRef = collection(db, 'users/0NCo1I2Nfzin7pxBYV2z/session')
-
   // const projectsCollectionRef = collection(db, `users/${user?.uid}/projects`)
   // const sessionCollectionRef = collection(db, `users/${user?.uid}/session`)
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
-      if (!user) return
-
-      const userDocRef = doc(db, 'users', user?.uid)
-      const userDoc = await getDoc(userDocRef)
-      userDoc.exists
-      if (!userDoc.exists) {
-        try {
-          await setDoc(doc(db, 'users', user?.uid), {
-            name: user.displayName,
-            email: user.email,
-          })
-        } catch (error) {
-          console.log('error', error)
+      if (user) {
+        const userDocRef = doc(db, 'users', user?.uid)
+        const userDoc = await getDoc(userDocRef)
+        userDoc.exists
+        if (!userDoc.exists) {
+          try {
+            await setDoc(doc(db, 'users', user?.uid), {
+              name: user.displayName,
+              email: user.email,
+            })
+          } catch (error) {
+            console.log('error', error)
+          }
         }
       }
       setUser(user)
@@ -102,6 +101,7 @@ export const App = () => {
 
   useEffect(() => {
     const getProjects = async () => {
+      // const querySnapshot = await getDocs(collection(db, `users/${user?.uid}/session`))
       const querySnapshot = await getDocs(projectsCollectionRef)
       const newProjects: Project[] = []
       querySnapshot.forEach((doc) => {
@@ -116,7 +116,7 @@ export const App = () => {
     if (user) {
       getProjects()
     }
-  }, [user, projectsCollectionRef])
+  }, [user])
 
   const fsTimestampToDate = (fsTimestamp: Timestamp) => {
     return new Date(fsTimestamp.seconds * 1000)
