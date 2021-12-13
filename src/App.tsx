@@ -15,6 +15,8 @@ import {
   orderBy,
   onSnapshot,
   Timestamp,
+  CollectionReference,
+  DocumentData,
 } from 'firebase/firestore'
 
 import './style/style.scss'
@@ -22,11 +24,13 @@ import { useEffect, useState } from 'react'
 import moment from 'moment'
 
 interface Session {
+  id: string
   start: Date
   end?: Date
 }
 
 interface Project {
+  id: string
   name: string
   rate: number
 }
@@ -35,8 +39,8 @@ const app = initializeApp(firebaseConfig)
 const auth = getAuth(app)
 const db = getFirestore(app)
 
-const projectsCollectionRef = collection(db, 'users/0NCo1I2Nfzin7pxBYV2z/projects')
-const sessionCollectionRef = collection(db, 'users/0NCo1I2Nfzin7pxBYV2z/session')
+// const projectsCollectionRef = collection(db, 'users/0NCo1I2Nfzin7pxBYV2z/projects')
+// const sessionCollectionRef = collection(db, 'users/0NCo1I2Nfzin7pxBYV2z/session')
 const provider = new GoogleAuthProvider()
 
 moment.locale('de')
@@ -46,16 +50,14 @@ export const App = () => {
   const [error, setError] = useState()
   const [sessions, setSessions] = useState<Session[]>([])
   const [projects, setProjects] = useState<Project[]>([])
-
-  // const projectsCollectionRef = collection(db, `users/${user?.uid}/projects`)
-  // const sessionCollectionRef = collection(db, `users/${user?.uid}/session`)
+  const [projectCollection, setProjectCollection] = useState<CollectionReference<DocumentData> | undefined>()
+  const [sessionCollection, setSessionCollection] = useState<CollectionReference<DocumentData> | undefined>()
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
       if (user) {
         const userDocRef = doc(db, 'users', user?.uid)
         const userDoc = await getDoc(userDocRef)
-        userDoc.exists
         if (!userDoc.exists) {
           try {
             await setDoc(doc(db, 'users', user?.uid), {
@@ -67,20 +69,25 @@ export const App = () => {
           }
         }
       }
+      setProjectCollection(user ? collection(db, `users/${user.uid}/projects`) : undefined)
+      setSessionCollection(user ? collection(db, `users/${user.uid}/session`) : undefined)
       setUser(user)
     })
     return unsubscribe
   }, [])
 
   useEffect(() => {
-    // const q = query(collection(db, `users/${user?.uid}/session`), orderBy('start', 'desc'))
-    const q = query(sessionCollectionRef, orderBy('start', 'desc'))
+    if (!sessionCollection) return
+
+    const q = query(sessionCollection, orderBy('start', 'desc'))
+    // const q = query(sessionCollectionRef, orderBy('start', 'desc'))
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const newSessions: Session[] = []
       querySnapshot.forEach((doc) => {
         const session = doc.data()
         if (!session.activ) {
           const s = {
+            id: doc.id,
             start: fsTimestampToDate(session.start),
             end: fsTimestampToDate(session.end),
           }
@@ -88,6 +95,7 @@ export const App = () => {
         }
         if (session.activ) {
           const s = {
+            id: doc.id,
             start: fsTimestampToDate(session.start),
           }
           newSessions.unshift(s)
@@ -97,26 +105,30 @@ export const App = () => {
     })
 
     return unsubscribe
-  }, [user])
+  }, [user, sessionCollection])
 
   useEffect(() => {
     const getProjects = async () => {
-      // const querySnapshot = await getDocs(collection(db, `users/${user?.uid}/session`))
-      const querySnapshot = await getDocs(projectsCollectionRef)
+      if (!projectCollection) return
+      const querySnapshot = await getDocs(projectCollection)
+      // const querySnapshot = await getDocs(projectsCollectionRef)
       const newProjects: Project[] = []
       querySnapshot.forEach((doc) => {
         const project = doc.data()
         newProjects.push({
+          id: doc.id,
           name: project.name,
           rate: project.rate,
         })
       })
       setProjects([...newProjects])
     }
+    console.log('getProjects')
+
     if (user) {
       getProjects()
     }
-  }, [user])
+  }, [user, projectCollection])
 
   const fsTimestampToDate = (fsTimestamp: Timestamp) => {
     return new Date(fsTimestamp.seconds * 1000)
@@ -131,8 +143,10 @@ export const App = () => {
   }
 
   const addProjects = async () => {
+    if (!projectCollection) return
+
     try {
-      await addDoc(projectsCollectionRef, {
+      await addDoc(projectCollection, {
         name: 'added project',
         rate: 25.5,
       })
@@ -141,9 +155,9 @@ export const App = () => {
     }
   }
 
-  const addSession = async () => {
+  const addSession = async (sessionCollection: CollectionReference<DocumentData>) => {
     try {
-      const newDoc = await addDoc(sessionCollectionRef, {
+      const newDoc = await addDoc(sessionCollection, {
         activ: true,
         start: new Date(),
       })
@@ -154,7 +168,9 @@ export const App = () => {
   }
 
   const trackTime = async () => {
-    const q = query(sessionCollectionRef, where('activ', '==', true))
+    if (!sessionCollection) return
+
+    const q = query(sessionCollection, where('activ', '==', true))
     const querySnapshot = await getDocs(q)
     if (querySnapshot.size === 1) {
       const activSessionDoc = querySnapshot.docs[0].ref
@@ -164,7 +180,7 @@ export const App = () => {
       })
     }
     if (querySnapshot.size === 0) {
-      await addSession()
+      await addSession(sessionCollection)
     }
   }
 
@@ -181,7 +197,7 @@ export const App = () => {
           <p>Sessions</p>
           <ul>
             {sessions.map((session) => (
-              <li key={session.start.toISOString()}>
+              <li key={session.id}>
                 From: <span>{moment(session.start).format('DD.MM.YY : h:mm:ss')} </span>
                 To: <span>{session?.end && moment(session.end).format('DD.MM.YY : h:mm:ss')}</span>
               </li>
@@ -190,7 +206,7 @@ export const App = () => {
           <p>Projects</p>
           <ul>
             {projects.map((project) => (
-              <li key={project.name}>
+              <li key={project.id}>
                 Name: <span>{project.name} - </span>
                 Rate: <span>{project.rate}</span>
               </li>
