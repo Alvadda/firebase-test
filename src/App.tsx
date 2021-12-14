@@ -17,6 +17,7 @@ import {
   Timestamp,
   CollectionReference,
   DocumentData,
+  connectFirestoreEmulator,
 } from 'firebase/firestore'
 
 import './style/style.scss'
@@ -38,9 +39,10 @@ interface Project {
 const app = initializeApp(firebaseConfig)
 const auth = getAuth(app)
 const db = getFirestore(app)
+if (process.env.NODE_ENV === 'development') {
+  connectFirestoreEmulator(db, 'localhost', 41234)
+}
 
-// const projectsCollectionRef = collection(db, 'users/0NCo1I2Nfzin7pxBYV2z/projects')
-// const sessionCollectionRef = collection(db, 'users/0NCo1I2Nfzin7pxBYV2z/session')
 const provider = new GoogleAuthProvider()
 
 moment.locale('de')

@@ -1,0 +1,19 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "session",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "end",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "start",
+          "order": "ASCENDING"
+        }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
