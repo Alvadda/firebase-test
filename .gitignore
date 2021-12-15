@@ -3,3 +3,7 @@ dist
 coverage
 cypress\videos 
 .env
+
+
+**/.logs
+ui-debug.log
