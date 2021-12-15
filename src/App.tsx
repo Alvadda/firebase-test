@@ -52,6 +52,8 @@ export const App = () => {
   const [error, setError] = useState()
   const [sessions, setSessions] = useState<Session[]>([])
   const [projects, setProjects] = useState<Project[]>([])
+  const [hours, setHours] = useState<number>()
+  const [earning, setEarning] = useState<number>()
   const [projectCollection, setProjectCollection] = useState<CollectionReference<DocumentData> | undefined>()
   const [sessionCollection, setSessionCollection] = useState<CollectionReference<DocumentData> | undefined>()
 
@@ -82,7 +84,6 @@ export const App = () => {
     if (!sessionCollection) return
 
     const q = query(sessionCollection, orderBy('start', 'desc'))
-    // const q = query(sessionCollectionRef, orderBy('start', 'desc'))
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const newSessions: Session[] = []
       querySnapshot.forEach((doc) => {
@@ -113,7 +114,6 @@ export const App = () => {
     const getProjects = async () => {
       if (!projectCollection) return
       const querySnapshot = await getDocs(projectCollection)
-      // const querySnapshot = await getDocs(projectsCollectionRef)
       const newProjects: Project[] = []
       querySnapshot.forEach((doc) => {
         const project = doc.data()
@@ -131,6 +131,12 @@ export const App = () => {
       getProjects()
     }
   }, [user, projectCollection])
+
+  useEffect(() => {
+    if (hours) {
+      setEarning(hours * projects[1].rate)
+    }
+  }, [hours, projects])
 
   const fsTimestampToDate = (fsTimestamp: Timestamp) => {
     return new Date(fsTimestamp.seconds * 1000)
@@ -186,6 +192,24 @@ export const App = () => {
     }
   }
 
+  const getStats = async () => {
+    if (!sessionCollection) return
+
+    const start = new Date('2021-11-01')
+    const end = new Date('2021-11-29')
+    const q = query(sessionCollection, where('start', '>=', start), where('start', '<=', end))
+    const querySnapshot = await getDocs(q)
+    let sessionHours = 0
+    querySnapshot.forEach((doc) => {
+      const session = doc.data()
+      const start = moment(fsTimestampToDate(session.start))
+      const end = moment(fsTimestampToDate(session.end))
+      const sessionDuration = end.diff(start, 'hour', true)
+      sessionHours += sessionDuration
+    })
+    setHours(+sessionHours.toFixed(2))
+  }
+
   return (
     <>
       <h1>Time Tracking</h1>
@@ -193,9 +217,12 @@ export const App = () => {
         <div>
           <p>User: {user.displayName}</p>
           <p>Email: {user.email}</p>
+          <p>Hours Worked: {hours}H</p>
+          <p>Earned: {earning}</p>
           <button onClick={() => auth.signOut()}>Sign Out</button>
           <button onClick={() => addProjects()}>Add Projects</button>
           <button onClick={() => trackTime()}>Track Time</button>
+          <button onClick={getStats}>Get Stats</button>
           <p>Sessions</p>
           <ul>
             {sessions.map((session) => (
