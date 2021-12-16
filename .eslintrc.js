@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   parser: '@typescript-eslint/parser',
   parserOptions: {
     ecmaVersion: 2020,
@@ -8,6 +8,9 @@ module.exports = {
     react: {
       version: 'detect',
     },
+  },
+  parserOptions: {
+    project: './tsconfig.json',
   },
   extends: [
     'plugin:react/recommended',

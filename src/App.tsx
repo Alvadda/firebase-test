@@ -19,7 +19,7 @@ import {
   DocumentData,
   connectFirestoreEmulator,
 } from 'firebase/firestore'
-
+import { getFunctions, connectFunctionsEmulator } from 'firebase/functions'
 import './style/style.scss'
 import { useEffect, useState } from 'react'
 import moment from 'moment'
@@ -39,6 +39,9 @@ interface Project {
 const app = initializeApp(firebaseConfig)
 const auth = getAuth(app)
 const db = getFirestore(app)
+const functions = getFunctions(app)
+connectFunctionsEmulator(functions, 'localhost', 5001)
+
 if (process.env.NODE_ENV === 'development') {
   connectFirestoreEmulator(db, 'localhost', 41234)
 }
@@ -125,7 +128,6 @@ export const App = () => {
       })
       setProjects([...newProjects])
     }
-    console.log('getProjects')
 
     if (user) {
       getProjects()
@@ -134,7 +136,7 @@ export const App = () => {
 
   useEffect(() => {
     if (hours) {
-      setEarning(hours * projects[1].rate)
+      setEarning(+(hours * projects[1].rate).toFixed(2))
     }
   }, [hours, projects])
 
@@ -218,7 +220,7 @@ export const App = () => {
           <p>User: {user.displayName}</p>
           <p>Email: {user.email}</p>
           <p>Hours Worked: {hours}H</p>
-          <p>Earned: {earning}</p>
+          <p>Earned: {earning}€</p>
           <button onClick={() => auth.signOut()}>Sign Out</button>
           <button onClick={() => addProjects()}>Add Projects</button>
           <button onClick={() => trackTime()}>Track Time</button>
