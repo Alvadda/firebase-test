@@ -1,4 +1,3 @@
-import { session } from './index'
 import * as functions from 'firebase-functions'
 import * as admin from 'firebase-admin'
 
@@ -18,22 +17,39 @@ export const session = functions.firestore.document('users/{documentId}/session/
   return Promise.resolve()
 })
 
-export const schadueldFunc = functions.pubsub.schedule('every 5 minutes').onRun(async (context) => {
-  const users = await db.collection('users').get()
+export const getOpenSessions = functions.https.onRequest(async (request, response) => {
+  const users = await db.collection('/users/').get()
+  const docs: any = []
 
   users.forEach(async (doc) => {
-    const userSessions = await db.collection(`users/${doc.id}/sessions`).where('activ', '==', true).where('end', '==', '').get()
-    const maxSessionsDuration = doc.data().maxSessionsDuration
+    const userSessions = await db.collection(`/users/${doc.id}/session/`).where('activ', '==', true).get()
 
-    userSessions.forEach(async (doc) => {
-      const sessionDoc = doc.data()
-      // prüfen ob Start länger her ist als die max sessions Duration die vom User angegeben ist
-      if (sessionDoc.start > maxSessionsDuration) {
-        doc.ref.update({
-          activ: false,
-          invalid: true,
-        })
-      }
+    userSessions.forEach((doc) => {
+      console.log(doc.data())
+      docs.push(doc.data())
+      // Do something with the open sessions
     })
   })
+
+  response.json(docs)
 })
+
+// export const schadueldFunc = functions.pubsub.schedule('every 5 minutes').onRun(async (context) => {
+//   const users = await db.collection('users').get()
+
+//   users.forEach(async (doc) => {
+//     const userSessions = await db.collection(`users/${doc.id}/sessions`).where('activ', '==', true).where('end', '==', '').get()
+//     const maxSessionsDuration = doc.data().maxSessionsDuration
+
+//     userSessions.forEach(async (doc) => {
+//       const sessionDoc = doc.data()
+//       // prüfen ob Start länger her ist als die max sessions Duration die vom User angegeben ist
+//       if (sessionDoc.start > maxSessionsDuration) {
+//         doc.ref.update({
+//           activ: false,
+//           invalid: true,
+//         })
+//       }
+//     })
+//   })
+// })

@@ -1,8 +1,5 @@
-import { initializeApp } from 'firebase/app'
-import { firebaseConfig } from './firebase.config'
-import { getAuth, signInWithPopup, GoogleAuthProvider, User } from 'firebase/auth'
+import { signInWithPopup } from 'firebase/auth'
 import {
-  getFirestore,
   collection,
   doc,
   getDoc,
@@ -17,71 +14,88 @@ import {
   Timestamp,
   CollectionReference,
   DocumentData,
-  connectFirestoreEmulator,
+  enableIndexedDbPersistence,
 } from 'firebase/firestore'
-import { getFunctions, connectFunctionsEmulator } from 'firebase/functions'
 import './style/style.scss'
 import { useEffect, useState } from 'react'
 import moment from 'moment'
+import { db, auth, googleProvider, getProjects } from './firebaseApi'
+import { useFirebase } from './hooks/useFirebase'
 
-interface Session {
+export interface Session {
   id: string
   start: Date
   end?: Date
 }
 
-interface Project {
+export interface Project {
   id: string
   name: string
   rate: number
 }
 
-const app = initializeApp(firebaseConfig)
-const auth = getAuth(app)
-const db = getFirestore(app)
-const functions = getFunctions(app)
-connectFunctionsEmulator(functions, 'localhost', 5001)
+// const app = initializeApp(firebaseConfig)
+// const auth = getAuth(app)
+// const db = getFirestore(app)
+// const functions = getFunctions(app)
 
-if (process.env.NODE_ENV === 'development') {
-  connectFirestoreEmulator(db, 'localhost', 41234)
-}
+// if (process.env.NODE_ENV === 'development') {
+//   connectFirestoreEmulator(db, 'localhost', 41234)
+//   connectFunctionsEmulator(functions, 'localhost', 5001)
+// }
 
-const provider = new GoogleAuthProvider()
+// const provider = new GoogleAuthProvider()
 
 moment.locale('de')
 
 export const App = () => {
-  const [user, setUser] = useState<User | null>()
+  // const [user, setUser] = useState<User | null>()
   const [error, setError] = useState()
   const [sessions, setSessions] = useState<Session[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [hours, setHours] = useState<number>()
   const [earning, setEarning] = useState<number>()
-  const [projectCollection, setProjectCollection] = useState<CollectionReference<DocumentData> | undefined>()
-  const [sessionCollection, setSessionCollection] = useState<CollectionReference<DocumentData> | undefined>()
+  // const [projectCollection, setProjectCollection] = useState<CollectionReference<DocumentData> | undefined>()
+  // const [sessionCollection, setSessionCollection] = useState<CollectionReference<DocumentData> | undefined>()
 
-  useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(async (user) => {
-      if (user) {
-        const userDocRef = doc(db, 'users', user?.uid)
-        const userDoc = await getDoc(userDocRef)
-        if (!userDoc.exists) {
-          try {
-            await setDoc(doc(db, 'users', user?.uid), {
-              name: user.displayName,
-              email: user.email,
-            })
-          } catch (error) {
-            console.log('error', error)
-          }
-        }
-      }
-      setProjectCollection(user ? collection(db, `users/${user.uid}/projects`) : undefined)
-      setSessionCollection(user ? collection(db, `users/${user.uid}/session`) : undefined)
-      setUser(user)
-    })
-    return unsubscribe
-  }, [])
+  const { db, getProjects, googleProvider, user, projectCollection, sessionCollection } = useFirebase()
+  // useEffect(() => {
+  //   // Offline support
+  //   enableIndexedDbPersistence(db).catch((err) => {
+  //     if (err.code == 'failed-precondition') {
+  //       // Multiple tabs open, persistence can only be enabled
+  //       // in one tab at a a time.
+  //       // ...
+  //       console.log('tabs')
+  //     } else if (err.code == 'unimplemented') {
+  //       // The current browser does not support all of the
+  //       // features required to enable persistence
+  //       // ...
+  //       console.log('not support')
+  //     }
+  //   })
+
+  //   const unsubscribe = auth.onAuthStateChanged(async (user) => {
+  //     if (user) {
+  //       const userDocRef = doc(db, 'users', user?.uid)
+  //       const userDoc = await getDoc(userDocRef)
+  //       if (!userDoc.exists) {
+  //         try {
+  //           await setDoc(doc(db, 'users', user?.uid), {
+  //             name: user.displayName,
+  //             email: user.email,
+  //           })
+  //         } catch (error) {
+  //           console.log('error', error)
+  //         }
+  //       }
+  //     }
+  //     setProjectCollection(user ? collection(db, `users/${user.uid}/projects`) : undefined)
+  //     setSessionCollection(user ? collection(db, `users/${user.uid}/session`) : undefined)
+  //     setUser(user)
+  //   })
+  //   return unsubscribe
+  // }, [])
 
   useEffect(() => {
     if (!sessionCollection) return
@@ -114,23 +128,35 @@ export const App = () => {
   }, [user, sessionCollection])
 
   useEffect(() => {
-    const getProjects = async () => {
-      if (!projectCollection) return
-      const querySnapshot = await getDocs(projectCollection)
-      const newProjects: Project[] = []
-      querySnapshot.forEach((doc) => {
-        const project = doc.data()
-        newProjects.push({
-          id: doc.id,
-          name: project.name,
-          rate: project.rate,
-        })
-      })
-      setProjects([...newProjects])
+    // const getProjects = async () => {
+    //   if (!projectCollection) return
+    //   const querySnapshot = await getDocs(projectCollection)
+    //   const newProjects: Project[] = []
+    //   querySnapshot.forEach((doc) => {
+    //     const project = doc.data()
+    //     newProjects.push({
+    //       id: doc.id,
+    //       name: project.name,
+    //       rate: project.rate,
+    //     })
+    //   })
+    //   setProjects([...newProjects])
+    // }
+    // const getProjectsFromApi = async () => {
+    //   if (projectCollection) {
+    //     const newProjects = await getProjects(projectCollection)
+    //     setProjects([...newProjects])
+    //   }
+    // }
+    const getProjectsFromApi = async () => {
+      if (projectCollection) {
+        const newProjects = await getProjects()
+        setProjects([...newProjects])
+      }
     }
 
     if (user) {
-      getProjects()
+      getProjectsFromApi()
     }
   }, [user, projectCollection])
 
@@ -146,7 +172,7 @@ export const App = () => {
 
   const signInWithGoogle = async () => {
     try {
-      await signInWithPopup(auth, provider)
+      await signInWithPopup(auth, googleProvider)
     } catch (error: any) {
       setError(error.message)
     }
